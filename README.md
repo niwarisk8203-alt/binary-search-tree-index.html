@@ -4,148 +4,202 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BST Visualizer</title>
+    <title>BST Canvas Pro</title>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; flex-direction: column; align-items: center; margin: 0; }
-        .controls { background: white; padding: 20px; width: 100%; display: flex; justify-content: center; gap: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); z-index: 10; }
-        input { padding: 10px; border: 1px solid #ddd; border-radius: 4px; outline: none; }
-        button { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; background: #007bff; color: white; font-weight: bold; }
-        button:hover { background: #0056b3; }
-        button.clear { background: #dc3545; }
-        
-        #tree-container { position: relative; width: 100%; height: 80vh; overflow: auto; padding-top: 50px; }
-        .node {
-            position: absolute;
-            width: 40px;
-            height: 40px;
-            background: #2ecc71;
-            color: white;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: bold;
-            transition: all 0.5s ease;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
-            z-index: 2;
+        :root {
+            --bg: #0f172a;
+            --accent: #38bdf8;
+            --node-bg: #1e293b;
+            --text: #f8fafc;
+            --highlight: #fbbf24;
         }
-        svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+
+        body {
+            margin: 0;
+            background-color: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', system-ui, sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .toolbar {
+            padding: 1rem;
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(10px);
+            display: flex;
+            gap: 1rem;
+            border-bottom: 1px solid #334155;
+            justify-content: center;
+        }
+
+        input {
+            background: #0f172a;
+            border: 1px solid #334155;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            outline: none;
+        }
+
+        button {
+            background: var(--accent);
+            color: var(--bg);
+            border: none;
+            padding: 0.5rem 1.2rem;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        button:hover { opacity: 0.8; }
+        button.secondary { background: #64748b; color: white; }
+
+        #canvas-container {
+            flex-grow: 1;
+            position: relative;
+        }
+
+        canvas { width: 100%; height: 100%; }
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            font-size: 0.8rem;
+            color: #94a3b8;
+        }
     </style>
 </head>
 <body>
 
-<div class="controls">
-    <input type="number" id="node-input" placeholder="Enter a number">
-    <button onclick="handleInsert()">Insert Node</button>
-    <button class="clear" onclick="resetTree()">Clear Tree</button>
+<div class="toolbar">
+    <input type="number" id="valInput" placeholder="Enter Value">
+    <button onclick="action('insert')">Insert</button>
+    <button class="secondary" onclick="action('search')">Search</button>
+    <button class="secondary" style="background:#ef4444" onclick="action('clear')">Clear</button>
 </div>
 
-<div id="tree-container">
-    <svg id="svg-canvas"></svg>
-    <div id="nodes-layer"></div>
+<div id="canvas-container">
+    <canvas id="treeCanvas"></canvas>
+    <div class="legend">
+        ● Smaller values → Left <br>
+        ● Larger values → Right
+    </div>
 </div>
 
 <script>
+    const canvas = document.getElementById('treeCanvas');
+    const ctx = canvas.getContext('2d');
+    const input = document.getElementById('valInput');
+
     class Node {
-        constructor(value, x, y, level) {
-            this.value = value;
+        constructor(val) {
+            this.val = val;
             this.left = null;
             this.right = null;
-            this.x = x;
-            this.y = y;
-            this.level = level;
+            this.highlight = false;
         }
     }
 
     let root = null;
-    const container = document.getElementById('tree-container');
-    const nodesLayer = document.getElementById('nodes-layer');
-    const svgCanvas = document.getElementById('svg-canvas');
-    const input = document.getElementById('node-input');
 
-    const VERTICAL_SPACING = 80;
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        draw();
+    }
 
-    function handleInsert() {
+    window.addEventListener('resize', resize);
+    resize();
+
+    function action(type) {
         const val = parseInt(input.value);
-        if (isNaN(val)) return;
-        
-        insert(val);
+        if (type === 'clear') {
+            root = null;
+        } else if (!isNaN(val)) {
+            if (type === 'insert') {
+                root = insert(root, val);
+            } else if (type === 'search') {
+                resetHighlights(root);
+                search(root, val);
+            }
+        }
         input.value = '';
-        render();
+        draw();
     }
 
-    function insert(value) {
-        if (!root) {
-            root = new Node(value, window.innerWidth / 2, 50, 0);
-            return;
-        }
-        recursiveInsert(root, value, window.innerWidth / 2, 50, 0, window.innerWidth / 4);
+    function insert(node, val) {
+        if (!node) return new Node(val);
+        if (val < node.val) node.left = insert(node.left, val);
+        else if (val > node.val) node.right = insert(node.right, val);
+        return node;
     }
 
-    function recursiveInsert(node, value, x, y, level, offset) {
-        if (value < node.value) {
-            if (node.left) {
-                recursiveInsert(node.left, value, node.left.x, node.left.y, level + 1, offset / 1.8);
-            } else {
-                node.left = new Node(value, x - offset, y + VERTICAL_SPACING, level + 1);
-            }
-        } else if (value > node.value) {
-            if (node.right) {
-                recursiveInsert(node.right, value, node.right.x, node.right.y, level + 1, offset / 1.8);
-            } else {
-                node.right = new Node(value, x + offset, y + VERTICAL_SPACING, level + 1);
-            }
-        }
+    function search(node, val) {
+        if (!node) return;
+        node.highlight = true;
+        if (val < node.val) search(node.left, val);
+        else if (val > node.val) search(node.right, val);
     }
 
-    function render() {
-        nodesLayer.innerHTML = '';
-        svgCanvas.innerHTML = '';
+    function resetHighlights(node) {
+        if (!node) return;
+        node.highlight = false;
+        resetHighlights(node.left);
+        resetHighlights(node.right);
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         if (root) {
-            drawNode(root);
+            drawNode(root, canvas.width / 2, 60, canvas.width / 4);
         }
     }
 
-    function drawNode(node) {
-        // Create Visual Circle Node
-        const div = document.createElement('div');
-        div.className = 'node';
-        div.innerText = node.value;
-        div.style.left = `${node.x - 20}px`;
-        div.style.top = `${node.y - 20}px`;
-        nodesLayer.appendChild(div);
+    function drawNode(node, x, y, offset) {
+        const radius = 22;
 
-        // Draw lines to children
+        // Draw connections first (so they go behind circles)
         if (node.left) {
-            drawLine(node.x, node.y, node.left.x, node.left.y);
-            drawNode(node.left);
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x - offset, y + 80);
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            drawNode(node.left, x - offset, y + 80, offset / 1.9);
         }
+
         if (node.right) {
-            drawLine(node.x, node.y, node.right.x, node.right.y);
-            drawNode(node.right);
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + offset, y + 80);
+            ctx.strokeStyle = '#334155';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            drawNode(node.right, x + offset, y + 80, offset / 1.9);
         }
-    }
 
-    function drawLine(x1, y1, x2, y2) {
-        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-        line.setAttribute("x1", x1);
-        line.setAttribute("y1", y1);
-        line.setAttribute("x2", x2);
-        line.setAttribute("y2", y2);
-        line.setAttribute("stroke", "#bdc3c7");
-        line.setAttribute("stroke-width", "2");
-        svgCanvas.appendChild(line);
-    }
+        // Draw Circle
+        ctx.beginPath();
+        ctx.arc(x, y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = node.highlight ? '#fbbf24' : '#1e293b';
+        ctx.fill();
+        ctx.strokeStyle = node.highlight ? '#fff' : '#38bdf8';
+        ctx.lineWidth = 3;
+        ctx.stroke();
 
-    function resetTree() {
-        root = null;
-        render();
+        // Draw Value
+        ctx.fillStyle = node.highlight ? '#000' : '#fff';
+        ctx.font = 'bold 14px Inter';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(node.val, x, y);
     }
-
-    // Allow "Enter" key to insert
-    input.addEventListener("keyup", (event) => {
-        if (event.key === "Enter") handleInsert();
-    });
 </script>
 
 </body>
