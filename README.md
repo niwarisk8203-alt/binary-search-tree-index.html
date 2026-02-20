@@ -3,162 +3,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BST CRUD Management System</title>
-    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
+    <title>BST Visualizer - ระบบจำลองโครงสร้างต้นไม้</title>
     <style>
-        :root {
-            --primary: #2E7D32;
-            --secondary: #FB8C00;
-            --danger: #D32F2F;
-            --bg: #F4F7F6;
-        }
-        body { font-family: 'Kanit', sans-serif; background: var(--bg); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
-        .app-container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 1000px; }
-        h1 { text-align: center; color: var(--primary); margin-bottom: 25px; }
-        
-        /* CRUD Panel */
-        .crud-controls { display: flex; justify-content: center; gap: 10px; margin-bottom: 30px; flex-wrap: wrap; }
-        input { padding: 12px; border: 2px solid #DDD; border-radius: 10px; width: 120px; outline: none; font-size: 16px; }
-        button { padding: 12px 20px; border: none; border-radius: 10px; cursor: pointer; color: white; font-weight: 600; transition: 0.3s; }
-        
-        .btn-create { background: var(--primary); } /* Create */
-        .btn-delete { background: var(--danger); }  /* Delete */
-        .btn-reset { background: #757575; }           /* Reset */
-
-        /* Tree Display (Read) */
-        #tree-area { position: relative; width: 100%; height: 500px; background: #FFF; border: 1px solid #EEE; border-radius: 15px; overflow: hidden; }
-        .node { width: 45px; height: 45px; background: linear-gradient(145deg, #A5D6A7, #2E7D32); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; position: absolute; font-weight: bold; z-index: 10; border: 2px solid white; box-shadow: 0 4px 8px rgba(0,0,0,0.2); transition: 0.5s; }
-        svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-        line { stroke: #81C784; stroke-width: 3; }
-
-        /* Status & Traversal */
-        .status-panel { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-top: 25px; }
-        .info-card { padding: 15px; border-radius: 12px; text-align: center; background: #F9F9F9; border-bottom: 4px solid var(--primary); }
-        .info-card h4 { margin: 0 0 10px 0; color: #555; }
-        .info-card p { margin: 0; font-size: 14px; color: var(--primary); font-weight: bold; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background-color: #f4f7f6; margin: 0; padding: 20px; }
+        .controls { margin-bottom: 20px; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: inline-block; }
+        input { padding: 10px; width: 60px; border: 1px solid #ddd; border-radius: 5px; outline: none; }
+        button { padding: 10px 20px; cursor: pointer; background-color: #28a745; color: white; border: none; border-radius: 5px; transition: 0.3s; }
+        button:hover { background-color: #218838; }
+        #tree-container { position: relative; width: 100%; height: 500px; margin-top: 20px; }
+        .node { position: absolute; width: 40px; height: 40px; background-color: #007bff; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; transition: all 0.5s; z-index: 2; border: 2px solid #0056b3; }
+        .line { position: absolute; background-color: #ccc; height: 2px; transform-origin: top left; z-index: 1; }
     </style>
 </head>
 <body>
 
-<div class="app-container">
-    <h1>BST CRUD Management</h1>
+    <h1>Binary Search Tree Visualizer</h1>
     
-    <div class="crud-controls">
-        <input type="number" id="inputValue" placeholder="ระบุตัวเลข">
-        <button class="btn-create" onclick="handleInsert()">➕ Create (Insert)</button>
-        <button class="btn-delete" onclick="handleDelete()">🗑️ Delete (Remove)</button>
-        <button class="btn-reset" onclick="handleReset()">🔄 Reset</button>
+    <div class="controls">
+        <input type="number" id="node-value" placeholder="ค่า">
+        <button onclick="insertNode()">เพิ่มโหนด (Insert)</button>
+        <button onclick="resetTree()" style="background-color: #dc3545;">ล้างหน้าจอ</button>
     </div>
 
-    <div id="tree-area">
-        <svg id="line-layer"></svg>
-    </div>
+    <div id="tree-container"></div>
 
-    <div class="status-panel">
-        <div class="info-card"><h4>Preorder (Read)</h4><p id="pre-out">-</p></div>
-        <div class="info-card"><h4>Inorder (Read)</h4><p id="ino-out">-</p></div>
-        <div class="info-card"><h4>Postorder (Read)</h4><p id="post-out">-</p></div>
-    </div>
-</div>
-
-<script>
-    class Node {
-        constructor(v) { this.v = v; this.left = null; this.right = null; this.x = 0; this.y = 0; }
-    }
-    let root = null;
-    const area = document.getElementById('tree-area');
-    const svg = document.getElementById('line-layer');
-
-    // CRUD: Create
-    function handleInsert() {
-        const v = parseInt(document.getElementById('inputValue').value);
-        if (isNaN(v)) return;
-        root = insert(root, v);
-        document.getElementById('inputValue').value = '';
-        render();
-    }
-
-    function insert(node, v) {
-        if (!node) return new Node(v);
-        if (v < node.v) node.left = insert(node.left, v);
-        else if (v > node.v) node.right = insert(node.right, v);
-        return node;
-    }
-
-    // CRUD: Delete
-    function handleDelete() {
-        const v = parseInt(document.getElementById('inputValue').value);
-        if (isNaN(v)) return;
-        root = remove(root, v);
-        document.getElementById('inputValue').value = '';
-        render();
-    }
-
-    function remove(node, v) {
-        if (!node) return null;
-        if (v < node.v) node.left = remove(node.left, v);
-        else if (v > node.v) node.right = remove(node.right, v);
-        else {
-            if (!node.left) return node.right;
-            if (!node.right) return node.left;
-            let minNode = node.right;
-            while (minNode.left) minNode = minNode.left;
-            node.v = minNode.v;
-            node.right = remove(node.right, minNode.v);
+    <script>
+        class Node {
+            constructor(value) {
+                this.value = value;
+                this.left = null;
+                this.right = null;
+                this.x = 0;
+                this.y = 0;
+            }
         }
-        return node;
-    }
 
-    // CRUD: Read & Update UI
-    function render() {
-        document.querySelectorAll('.node').forEach(n => n.remove());
-        svg.innerHTML = '';
-        if (!root) return updateTraversals();
-        calc(root, area.offsetWidth / 2, 50, area.offsetWidth / 4);
-        draw(root);
-        updateTraversals();
-    }
+        let root = null;
+        const container = document.getElementById('tree-container');
+        const nodeRadius = 20;
+        const verticalSpacing = 70;
 
-    function calc(n, x, y, s) {
-        if (!n) return;
-        n.x = x; n.y = y;
-        if (n.left) calc(n.left, x - s, y + 80, s / 2);
-        if (n.right) calc(n.right, x + s, y + 80, s / 2);
-    }
-
-    function draw(n) {
-        if (!n) return;
-        if (n.left) drawLine(n.x, n.y, n.left.x, n.left.y);
-        if (n.right) drawLine(n.x, n.y, n.right.x, n.right.y);
-        const d = document.createElement('div');
-        d.className = 'node'; d.innerText = n.v;
-        d.style.left = (n.x - 22) + 'px'; d.style.top = (n.y - 22) + 'px';
-        area.appendChild(d);
-        draw(n.left); draw(n.right);
-    }
-
-    function drawLine(x1, y1, x2, y2) {
-        const l = document.createElementNS("http://www.w3.org/2000/svg", "line");
-        l.setAttribute("x1", x1); l.setAttribute("y1", y1);
-        l.setAttribute("x2", x2); l.setAttribute("y2", y2);
-        svg.appendChild(l);
-    }
-
-    function updateTraversals() {
-        let pre = [], ino = [], post = [];
-        function walk(n) {
-            if (!n) return;
-            pre.push(n.v); walk(n.left);
-            ino.push(n.v); walk(n.right);
-            post.push(n.v);
+        function insertNode() {
+            const val = parseInt(document.getElementById('node-value').value);
+            if (isNaN(val)) return;
+            
+            if (!root) {
+                root = new Node(val);
+            } else {
+                addNode(root, val);
+            }
+            document.getElementById('node-value').value = '';
+            updateVisualization();
         }
-        walk(root);
-        document.getElementById('pre-out').innerText = pre.join(' → ') || '-';
-        document.getElementById('ino-out').innerText = ino.join(' → ') || '-';
-        document.getElementById('post-out').innerText = post.join(' → ') || '-';
-    }
 
-    function handleReset() { root = null; render(); }
-</script>
+        function addNode(node, val) {
+            if (val < node.value) {
+                if (!node.left) node.left = new Node(val);
+                else addNode(node.left, val);
+            } else if (val > node.value) {
+                if (!node.right) node.right = new Node(val);
+                else addNode(node.right, val);
+            }
+        }
+
+        function updateVisualization() {
+            container.innerHTML = '';
+            if (!root) return;
+            
+            const width = container.offsetWidth;
+            calculatePositions(root, width / 2, 50, width / 4);
+            drawTree(root);
+        }
+
+        function calculatePositions(node, x, y, spacing) {
+            if (!node) return;
+            node.x = x;
+            node.y = y;
+            calculatePositions(node.left, x - spacing, y + verticalSpacing, spacing / 1.8);
+            calculatePositions(node.right, x + spacing, y + verticalSpacing, spacing / 1.8);
+        }
+
+        function drawTree(node) {
+            if (!node) return;
+
+            // วาดเส้นเชื่อม
+            if (node.left) drawLine(node.x, node.y, node.left.x, node.left.y);
+            if (node.right) drawLine(node.x, node.y, node.right.x, node.right.y);
+
+            // วาดวงกลมโหนด
+            const div = document.createElement('div');
+            div.className = 'node';
+            div.innerText = node.value;
+            div.style.left = (node.x - 20) + 'px';
+            div.style.top = (node.y - 20) + 'px';
+            container.appendChild(div);
+
+            drawTree(node.left);
+            drawTree(node.right);
+        }
+
+        function drawLine(x1, y1, x2, y2) {
+            const line = document.createElement('div');
+            line.className = 'line';
+            const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
+            const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+            
+            line.style.width = length + 'px';
+            line.style.left = x1 + 'px';
+            line.style.top = y1 + 'px';
+            line.style.transform = `rotate(${angle}deg)`;
+            container.appendChild(line);
+        }
+
+        function resetTree() {
+            root = null;
+            updateVisualization();
+        }
+
+        window.onresize = updateVisualization;
+    </script>
 </body>
 </html>
