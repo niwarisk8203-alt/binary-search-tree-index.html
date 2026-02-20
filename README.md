@@ -3,34 +3,73 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BST Visualizer - ระบบจำลองโครงสร้างต้นไม้</title>
+    <title>BST Professional Lab | Data Structure Visualizer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; background-color: #f4f7f6; margin: 0; padding: 20px; }
-        .controls { margin-bottom: 20px; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: inline-block; }
-        input { padding: 10px; width: 60px; border: 1px solid #ddd; border-radius: 5px; outline: none; }
-        button { padding: 10px 20px; cursor: pointer; background-color: #28a745; color: white; border: none; border-radius: 5px; transition: 0.3s; }
-        button:hover { background-color: #218838; }
-        #tree-container { position: relative; width: 100%; height: 500px; margin-top: 20px; }
-        .node { position: absolute; width: 40px; height: 40px; background-color: #007bff; color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; transition: all 0.5s; z-index: 2; border: 2px solid #0056b3; }
-        .line { position: absolute; background-color: #ccc; height: 2px; transform-origin: top left; z-index: 1; }
+        body { font-family: 'Inter', sans-serif; background-color: #0f172a; color: #f8fafc; overflow: hidden; }
+        .canvas-container { background-image: radial-gradient(#1e293b 1px, transparent 1px); background-size: 30px 30px; }
+        .node-circle { transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); stroke-width: 2; fill: #1e293b; stroke: #38bdf8; }
+        .node-text { fill: #f8fafc; font-size: 14px; font-weight: 600; pointer-events: none; }
+        .link-line { stroke: #334155; stroke-width: 2; transition: all 0.4s; }
+        .highlight-node { fill: #38bdf8; stroke: #fff; }
+        .sidebar { background-color: #1e293b; border-right: 1px solid #334155; }
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     </style>
 </head>
-<body>
+<body class="flex h-screen">
 
-    <h1>Binary Search Tree Visualizer</h1>
-    
-    <div class="controls">
-        <input type="number" id="node-value" placeholder="ค่า">
-        <button onclick="insertNode()">เพิ่มโหนด (Insert)</button>
-        <button onclick="resetTree()" style="background-color: #dc3545;">ล้างหน้าจอ</button>
-    </div>
+    <!-- Sidebar -->
+    <aside class="sidebar w-80 p-6 flex flex-col gap-6 z-10 shadow-xl">
+        <div>
+            <h1 class="text-xl font-bold text-sky-400 mb-1">BST Professional</h1>
+            <p class="text-xs text-slate-400 uppercase tracking-widest">Visual Laboratory</p>
+        </div>
 
-    <div id="tree-container"></div>
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm text-slate-400 mb-2">Node Value</label>
+                <div class="flex gap-2">
+                    <input type="number" id="node-input" class="w-full bg-slate-900 border border-slate-700 rounded px-3 py-2 outline-none focus:border-sky-500 transition" placeholder="Enter number...">
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+                <button onclick="handleInsert()" class="bg-sky-600 hover:bg-sky-500 text-white py-2 rounded text-sm font-medium transition">Insert</button>
+                <button onclick="handleDelete()" class="bg-slate-700 hover:bg-rose-600 text-white py-2 rounded text-sm font-medium transition">Delete</button>
+                <button onclick="handleSearch()" class="bg-slate-700 hover:bg-amber-500 text-white py-2 rounded text-sm font-medium transition col-span-2">Search Node</button>
+            </div>
+        </div>
+
+        <div class="border-t border-slate-700 pt-6">
+            <p class="text-sm font-semibold text-slate-300 mb-3">Traversals</p>
+            <div class="text-xs space-y-3">
+                <div class="bg-slate-900 p-2 rounded border border-slate-800">
+                    <span class="text-sky-400 font-bold">IN-ORDER:</span>
+                    <div id="inorder-res" class="mt-1 text-slate-400 break-all">-</div>
+                </div>
+                <div class="bg-slate-900 p-2 rounded border border-slate-800">
+                    <span class="text-emerald-400 font-bold">PRE-ORDER:</span>
+                    <div id="preorder-res" class="mt-1 text-slate-400 break-all">-</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-auto">
+            <button onclick="resetTree()" class="w-full border border-slate-700 hover:bg-slate-800 text-slate-400 py-2 rounded text-xs transition">Clear Board</button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 relative canvas-container overflow-hidden">
+        <div id="status-msg" class="absolute top-6 left-6 text-sm text-slate-500">System Ready</div>
+        <svg id="tree-svg" class="w-full h-full"></svg>
+    </main>
 
     <script>
         class Node {
-            constructor(value) {
-                this.value = value;
+            constructor(val) {
+                this.val = val;
                 this.left = null;
                 this.right = null;
                 this.x = 0;
@@ -39,88 +78,159 @@
         }
 
         let root = null;
-        const container = document.getElementById('tree-container');
-        const nodeRadius = 20;
-        const verticalSpacing = 70;
+        const svg = document.getElementById('tree-svg');
+        const nodeRadius = 22;
+        const verticalSpacing = 80;
 
-        function insertNode() {
-            const val = parseInt(document.getElementById('node-value').value);
+        function handleInsert() {
+            const val = parseInt(document.getElementById('node-input').value);
             if (isNaN(val)) return;
-            
-            if (!root) {
-                root = new Node(val);
-            } else {
-                addNode(root, val);
-            }
-            document.getElementById('node-value').value = '';
-            updateVisualization();
+            root = insert(root, val);
+            updateView(`Node ${val} inserted.`);
         }
 
-        function addNode(node, val) {
-            if (val < node.value) {
-                if (!node.left) node.left = new Node(val);
-                else addNode(node.left, val);
-            } else if (val > node.value) {
-                if (!node.right) node.right = new Node(val);
-                else addNode(node.right, val);
-            }
+        function insert(node, val) {
+            if (!node) return new Node(val);
+            if (val < node.val) node.left = insert(node.left, val);
+            else if (val > node.val) node.right = insert(node.right, val);
+            return node;
         }
 
-        function updateVisualization() {
-            container.innerHTML = '';
+        function handleDelete() {
+            const val = parseInt(document.getElementById('node-input').value);
+            root = deleteNode(root, val);
+            updateView(`Node ${val} deleted.`);
+        }
+
+        function deleteNode(node, val) {
+            if (!node) return null;
+            if (val < node.val) node.left = deleteNode(node.left, val);
+            else if (val > node.val) node.right = deleteNode(node.right, val);
+            else {
+                if (!node.left) return node.right;
+                if (!node.right) return node.left;
+                let min = findMin(node.right);
+                node.val = min.val;
+                node.right = deleteNode(node.right, min.val);
+            }
+            return node;
+        }
+
+        function findMin(node) {
+            while (node.left) node = node.left;
+            return node;
+        }
+
+        function handleSearch() {
+            const val = parseInt(document.getElementById('node-input').value);
+            const found = search(root, val);
+            updateView(found ? `Found node ${val}` : `Node ${val} not found`);
+            if (found) highlightNode(val);
+        }
+
+        function search(node, val) {
+            if (!node) return false;
+            if (node.val === val) return true;
+            return val < node.val ? search(node.left, val) : search(node.right, val);
+        }
+
+        function updateView(msg) {
+            document.getElementById('status-msg').innerText = msg;
+            document.getElementById('node-input').value = '';
+            render();
+            updateTraversals();
+        }
+
+        function render() {
+            svg.innerHTML = '';
             if (!root) return;
-            
-            const width = container.offsetWidth;
-            calculatePositions(root, width / 2, 50, width / 4);
-            drawTree(root);
+            const width = svg.clientWidth;
+            calculatePos(root, width / 2, 60, width / 4);
+            drawLinks(root);
+            drawNodes(root);
         }
 
-        function calculatePositions(node, x, y, spacing) {
+        function calculatePos(node, x, y, sep) {
             if (!node) return;
             node.x = x;
             node.y = y;
-            calculatePositions(node.left, x - spacing, y + verticalSpacing, spacing / 1.8);
-            calculatePositions(node.right, x + spacing, y + verticalSpacing, spacing / 1.8);
+            calculatePos(node.left, x - sep, y + verticalSpacing, sep / 1.9);
+            calculatePos(node.right, x + sep, y + verticalSpacing, sep / 1.9);
         }
 
-        function drawTree(node) {
+        function drawLinks(node) {
             if (!node) return;
-
-            // วาดเส้นเชื่อม
-            if (node.left) drawLine(node.x, node.y, node.left.x, node.left.y);
-            if (node.right) drawLine(node.x, node.y, node.right.x, node.right.y);
-
-            // วาดวงกลมโหนด
-            const div = document.createElement('div');
-            div.className = 'node';
-            div.innerText = node.value;
-            div.style.left = (node.x - 20) + 'px';
-            div.style.top = (node.y - 20) + 'px';
-            container.appendChild(div);
-
-            drawTree(node.left);
-            drawTree(node.right);
+            if (node.left) {
+                createLine(node.x, node.y, node.left.x, node.left.y);
+                drawLinks(node.left);
+            }
+            if (node.right) {
+                createLine(node.x, node.y, node.right.x, node.right.y);
+                drawLinks(node.right);
+            }
         }
 
-        function drawLine(x1, y1, x2, y2) {
-            const line = document.createElement('div');
-            line.className = 'line';
-            const length = Math.sqrt(Math.pow(x2 - x1, 2) + Math.pow(y2 - y1, 2));
-            const angle = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+        function createLine(x1, y1, x2, y2) {
+            const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+            line.setAttribute("x1", x1); line.setAttribute("y1", y1);
+            line.setAttribute("x2", x2); line.setAttribute("y2", y2);
+            line.setAttribute("class", "link-line");
+            svg.appendChild(line);
+        }
+
+        function drawNodes(node) {
+            if (!node) return;
+            const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
             
-            line.style.width = length + 'px';
-            line.style.left = x1 + 'px';
-            line.style.top = y1 + 'px';
-            line.style.transform = `rotate(${angle}deg)`;
-            container.appendChild(line);
+            const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+            circle.setAttribute("cx", node.x); circle.setAttribute("cy", node.y);
+            circle.setAttribute("r", nodeRadius);
+            circle.setAttribute("class", "node-circle");
+            circle.setAttribute("id", `node-${node.val}`);
+
+            const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            text.setAttribute("x", node.x); text.setAttribute("y", node.y + 5);
+            text.setAttribute("text-anchor", "middle");
+            text.setAttribute("class", "node-text");
+            text.textContent = node.val;
+
+            g.appendChild(circle);
+            g.appendChild(text);
+            svg.appendChild(g);
+
+            drawNodes(node.left);
+            drawNodes(node.right);
+        }
+
+        function highlightNode(val) {
+            const el = document.getElementById(`node-${val}`);
+            if (el) {
+                el.classList.add('highlight-node');
+                setTimeout(() => el.classList.remove('highlight-node'), 2000);
+            }
+        }
+
+        function updateTraversals() {
+            const inorder = [];
+            const preorder = [];
+            const traverse = (n) => {
+                if (!n) return;
+                preorder.push(n.val);
+                traverse(n.left);
+                inorder.push(n.val);
+                traverse(n.right);
+            };
+            traverse(root);
+            document.getElementById('inorder-res').innerText = inorder.join(' → ') || '-';
+            document.getElementById('preorder-res').innerText = preorder.join(' → ') || '-';
         }
 
         function resetTree() {
             root = null;
-            updateVisualization();
+            updateView("System Reset");
         }
 
-        window.onresize = updateVisualization;
+        window.onresize = render;
     </script>
 </body>
 </html>
